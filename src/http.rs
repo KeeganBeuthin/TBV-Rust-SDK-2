@@ -32,7 +32,20 @@ pub extern "C" fn handle_http_request(request_ptr: *const c_char) -> *mut c_char
     });
     let response = handle_request(request);
     let response_json = serde_json::to_string(&response).unwrap();
-    CString::new(response_json).unwrap().into_raw()
+    
+    // Debug logging
+    println!("Debug - Response JSON: {}", response_json);
+    
+    let c_string = CString::new(response_json).unwrap();
+    let ptr = c_string.into_raw();
+    
+    // Debug logging
+    unsafe {
+        let debug_str = CStr::from_ptr(ptr).to_str().unwrap();
+        println!("Debug - Final C string: {}", debug_str);
+    }
+    
+    ptr
 }
 
 fn handle_request(req: Request) -> Response {
