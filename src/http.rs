@@ -19,34 +19,14 @@ struct Response {
 
 #[no_mangle]
 pub extern "C" fn handle_http_request(request_ptr: *const c_char) -> *mut c_char {
-    println!("Entering handle_http_request");
-    let request_str = unsafe { 
-        match CStr::from_ptr(request_ptr).to_str() {
-            Ok(s) => s,
-            Err(e) => {
-                println!("Error converting request to string: {:?}", e);
-                return CString::new("{\"error\":\"Invalid UTF-8 in request\"}").unwrap().into_raw();
-            }
-        }
-    };
-    println!("Received request string: {}", request_str);
-    
+    let request_str = unsafe { CStr::from_ptr(request_ptr).to_str().unwrap() };
     let request = parse_request(request_str);
-    println!("Parsed request: {:?}", request);
-    
     let response = handle_request(request);
-    println!("Generated response: {:?}", response);
-    
     let response_json = serialize_response(response);
-    println!("Serialized response JSON: {}", response_json);
-    
-    let result = CString::new(response_json).unwrap().into_raw();
-    println!("Returning response pointer");
-    result
+    CString::new(response_json).unwrap().into_raw()
 }
 
 fn parse_request(request_str: &str) -> Request {
-    println!("Parsing request: {}", request_str);
     let mut lines = request_str.lines();
     let first_line = lines.next().unwrap_or("");
     let mut parts = first_line.split_whitespace();
@@ -73,12 +53,10 @@ fn parse_request(request_str: &str) -> Request {
         }
     }
 
-    println!("Parsed request - Method: {}, Path: {}, Headers: {:?}, Body: {}", method, path, headers, body);
     Request { method, path, headers, body }
 }
 
 fn handle_request(req: Request) -> Response {
-    println!("Handling request: {:?}", req);
     match (req.method.as_str(), req.path.as_str()) {
         ("GET", "/api/data") => handle_get_data(),
         ("POST", "/api/data") => handle_post_data(req.body),
@@ -89,7 +67,6 @@ fn handle_request(req: Request) -> Response {
 }
 
 fn handle_get_data() -> Response {
-    println!("Handling GET request");
     Response {
         status_code: 200,
         headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
@@ -98,7 +75,6 @@ fn handle_get_data() -> Response {
 }
 
 fn handle_post_data(body: String) -> Response {
-    println!("Handling POST request with body: {}", body);
     Response {
         status_code: 201,
         headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
@@ -107,7 +83,6 @@ fn handle_post_data(body: String) -> Response {
 }
 
 fn handle_put_data(body: String) -> Response {
-    println!("Handling PUT request with body: {}", body);
     Response {
         status_code: 200,
         headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
@@ -116,7 +91,6 @@ fn handle_put_data(body: String) -> Response {
 }
 
 fn handle_delete_data() -> Response {
-    println!("Handling DELETE request");
     Response {
         status_code: 200,
         headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
@@ -125,7 +99,6 @@ fn handle_delete_data() -> Response {
 }
 
 fn not_found_response() -> Response {
-    println!("Generating not found response");
     Response {
         status_code: 404,
         headers: HashMap::from([("Content-Type".to_string(), "text/plain".to_string())]),
@@ -134,25 +107,21 @@ fn not_found_response() -> Response {
 }
 
 fn serialize_response(response: Response) -> String {
-    println!("Serializing response: {:?}", response);
     let headers_json = response.headers.iter()
         .map(|(k, v)| format!(r#""{}":"{}""#, k, v))
         .collect::<Vec<String>>()
         .join(",");
 
-    let result = format!(
+    format!(
         r#"{{"statusCode":{},"headers":{{{}}},"body":"{}"}}"#,
         response.status_code,
         headers_json,
         response.body.replace("\"", "\\\"")
-    );
-    println!("Serialized response: {}", result);
-    result
+    )
 }
 
 #[no_mangle]
 pub extern "C" fn dealloc_str(ptr: *mut c_char) {
-    println!("Deallocating string");
     unsafe {
         if !ptr.is_null() {
             let _ = CString::from_raw(ptr);

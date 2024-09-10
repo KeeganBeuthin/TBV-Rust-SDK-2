@@ -7,7 +7,7 @@ pub extern "C" fn alloc(len: usize) -> *mut u8 {
 }
 
 #[no_mangle]
-pub extern "C" fn dealloc(ptr: *mut u8, len: usize) {
+pub extern "C" fn custom_dealloc_str(ptr: *mut u8, len: usize) {
     unsafe {
         let _ = Vec::from_raw_parts(ptr, 0, len);
     }
