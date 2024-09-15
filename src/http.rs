@@ -23,84 +23,53 @@ pub struct Response {
 
 #[no_mangle]
 pub extern "C" fn handle_http_request(request_ptr: *const c_char) -> *mut c_char {
-    let request_str = unsafe { CStr::from_ptr(request_ptr).to_str().unwrap() };
-    let request: Request = serde_json::from_str(request_str).unwrap_or_else(|_| Request {
-        method: "GET".to_string(),
-        path: "/".to_string(),
-        headers: HashMap::new(),
-        body: Value::Null,
-    });
+    let request_str = unsafe { std::ffi::CStr::from_ptr(request_ptr).to_str().unwrap() };
+    let request: Value = serde_json::from_str(request_str).unwrap();
+    
     let response = handle_request(request);
     let response_json = serde_json::to_string(&response).unwrap();
     
-    // Debug logging
-    println!("Debug - Response JSON: {}", response_json);
-    
-    let c_string = CString::new(response_json).unwrap();
-    let ptr = c_string.into_raw();
-    
-    // Debug logging
-    unsafe {
-        let debug_str = CStr::from_ptr(ptr).to_str().unwrap();
-        println!("Debug - Final C string: {}", debug_str);
-    }
-    
-    ptr
+    // Use CString to ensure proper null-termination
+    let c_str = CString::new(response_json).unwrap();
+    c_str.into_raw()
 }
 
-fn handle_request(req: Request) -> Response {
-    match (req.method.as_str(), req.path.as_str()) {
-        ("GET", "/api/data") => handle_get_data(),
-        ("POST", "/api/data") => handle_post_data(req.body),
-        ("PUT", "/api/data") => handle_put_data(req.body),
-        ("DELETE", "/api/data") => handle_delete_data(),
-        _ => not_found_response(),
-    }
-}
-
-fn handle_get_data() -> Response {
-    Response {
-        status_code: 200,
-        headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-        body: json!({"message": "Hello from WebAssembly API!"}),
-    }
-}
-
-fn handle_post_data(body: Value) -> Response {
-    Response {
-        status_code: 201,
-        headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-        body: json!({
-            "message": "Data created successfully",
-            "received": body
+fn handle_request(request: Value) -> Value {
+    let method = request["method"].as_str().unwrap();
+    let path = request["path"].as_str().unwrap();
+    
+    match (method, path) {
+        ("GET", "/api/data") => json!({
+            "status_code": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": {"message": "Hello from WebAssembly API!"}
         }),
-    }
-}
-
-fn handle_put_data(body: Value) -> Response {
-    Response {
-        status_code: 200,
-        headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-        body: json!({
-            "message": "Data updated successfully",
-            "received": body
+        ("POST", "/api/data") => json!({
+            "status_code": 201,
+            "headers": {"Content-Type": "application/json"},
+            "body": {
+                "message": "Data created successfully",
+                "received": request["body"]
+            }
         }),
-    }
-}
-
-fn handle_delete_data() -> Response {
-    Response {
-        status_code: 200,
-        headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-        body: json!({"message": "Data deleted successfully"}),
-    }
-}
-
-fn not_found_response() -> Response {
-    Response {
-        status_code: 404,
-        headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-        body: json!({"error": "Not Found"}),
+        ("PUT", "/api/data") => json!({
+            "status_code": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": {
+                "message": "Data updated successfully",
+                "received": request["body"]
+            }
+        }),
+        ("DELETE", "/api/data") => json!({
+            "status_code": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": {"message": "Data deleted successfully"}
+        }),
+        _ => json!({
+            "status_code": 404,
+            "headers": {"Content-Type": "application/json"},
+            "body": {"error": "Not Found"}
+        }),
     }
 }
 
